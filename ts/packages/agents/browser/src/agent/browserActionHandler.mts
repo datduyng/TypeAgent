@@ -2237,15 +2237,21 @@ async function executeBrowserActionImpl(
         case "browser.external":
             switch (action.actionName) {
                 case "closeWindow": {
-                    if (action.parameters.title !== undefined) {
+                    const control = getActionBrowserControl(context);
+                    try {
+                        if (action.parameters.title === undefined) {
+                            await control.closeWindow();
+                        } else {
+                            await control.closeWindow(action.parameters.title);
+                        }
+                        return;
+                    } catch (error) {
                         return createActionResultFromError(
-                            "Closing a browser window by title is not supported. The current window was left open.",
+                            error instanceof Error
+                                ? error.message
+                                : String(error),
                         );
                     }
-
-                    const control = getActionBrowserControl(context);
-                    await control.closeWindow();
-                    return;
                 }
             }
             break;
