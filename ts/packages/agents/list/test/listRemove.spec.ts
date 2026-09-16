@@ -81,12 +81,13 @@ async function removeItem(
     agent: ReturnType<typeof instantiate>,
     actionContext: ActionContext<any>,
     listName: string,
+    item = "apple",
 ) {
     return agent.executeAction!(
         {
             schemaName: "list",
             actionName: "removeItems",
-            parameters: { listName, items: ["apple"] },
+            parameters: { listName, items: [item] },
         },
         actionContext,
     );
@@ -126,6 +127,34 @@ describe("removeItems", () => {
         );
         expect(result.entities).toEqual([{ name: "grocery", type: ["list"] }]);
         expect(storage.getLists()).toEqual([{ name: "grocery", items: [] }]);
+        expect(storage.writes).toBe(1);
+    });
+
+    test("keeps an existing list unchanged when the item is absent", async () => {
+        const { agent, actionContext, storage } = await createAgent([
+            { name: "grocery", items: ["apple"] },
+        ]);
+
+        const result = (await removeItem(
+            agent,
+            actionContext,
+            "grocery",
+            "pear",
+        )) as any;
+
+        expect(result.historyText).toBe(
+            "Removed items: pear from list grocery",
+        );
+        expect(result.entities).toEqual([
+            {
+                name: "grocery",
+                type: ["list"],
+                facets: [{ name: "items", value: ["apple"] }],
+            },
+        ]);
+        expect(storage.getLists()).toEqual([
+            { name: "grocery", items: ["apple"] },
+        ]);
         expect(storage.writes).toBe(1);
     });
 });
