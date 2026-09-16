@@ -147,7 +147,6 @@ import {
 } from "./lookup/aiSearchLookup.mjs";
 import { LookupCommandHandlerTable } from "./lookup/lookupCommandHandlers.mjs";
 import { createExternalBrowserClient } from "./rpc/externalBrowserControlClient.mjs";
-import { executeCloseWindow } from "./externalBrowserActions.mjs";
 import { createAgentInvokeHandlers } from "./agentServiceHandlers.mjs";
 import { hookModelTokenUsage, runWithTokenUsage } from "./tokenUsage.mjs";
 
@@ -2237,10 +2236,17 @@ async function executeBrowserActionImpl(
             }
         case "browser.external":
             switch (action.actionName) {
-                case "closeWindow":
-                    return executeCloseWindow(action, () =>
-                        getActionBrowserControl(context),
-                    );
+                case "closeWindow": {
+                    if (action.parameters.title !== undefined) {
+                        return createActionResultFromError(
+                            "Closing a browser window by title is not supported. The current window was left open.",
+                        );
+                    }
+
+                    const control = getActionBrowserControl(context);
+                    await control.closeWindow();
+                    return;
+                }
             }
             break;
         case "browser.lookupAndAnswer":
