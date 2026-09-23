@@ -453,7 +453,19 @@ export class TermToSemanticRefIndex implements ITermToSemanticRefIndex {
     }
 
     removeTerm(term: string, semanticRefIndex: number): void {
-        this.map.delete(this.prepareTerm(term));
+        term = this.prepareTerm(term);
+        const postings = this.map.get(term);
+        if (postings === undefined) {
+            return;
+        }
+        const remaining = postings.filter(
+            (posting) => posting.semanticRefOrdinal !== semanticRefIndex,
+        );
+        if (remaining.length === 0) {
+            this.map.delete(term);
+        } else {
+            this.map.set(term, remaining);
+        }
     }
 
     removeTermIfEmpty(term: string): void {
