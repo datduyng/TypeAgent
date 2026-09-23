@@ -348,7 +348,7 @@ export class TermEmbeddingIndex
             eventHandler,
         );
         if (result.numberCompleted > 0) {
-            this.textArray.push(...terms);
+            this.textArray.push(...terms.slice(0, result.numberCompleted));
         }
         return result;
     }
