@@ -20,7 +20,12 @@ import {
     Term,
     TextRange,
 } from "./interfaces.js";
-import { Batch, compareTextRange, isInTextRange } from "./common.js";
+import {
+    Batch,
+    cloneTextRange,
+    compareTextRange,
+    isInTextRange,
+} from "./common.js";
 import { ScoredTextLocation } from "./textLocationIndex.js";
 import { getCountOfMessagesInCharBudget } from "./message.js";
 
@@ -632,7 +637,8 @@ export function intersectScoredMessageOrdinals(
 }
 
 export class TextRangeCollection implements Iterable<TextRange> {
-    // Maintains ranges sorted by message index
+    // Maintains ranges sorted by message index. Stored ranges are private
+    // copies: ordering and maxSpan are only valid if they never change.
     private ranges: TextRange[];
     // Largest message span of any range; bounds the search in isInRange
     private maxSpan: number = 0;
@@ -647,7 +653,7 @@ export class TextRangeCollection implements Iterable<TextRange> {
                 this.addRanges(ranges);
             }
         } else {
-            this.ranges = ranges ?? [];
+            this.ranges = (ranges ?? []).map(cloneTextRange);
             this.ranges.forEach((r) => this.updateMaxSpan(r));
         }
     }
@@ -657,28 +663,30 @@ export class TextRangeCollection implements Iterable<TextRange> {
     }
 
     public getRanges(): TextRange[] {
-        return this.ranges;
+        return this.ranges.map(cloneTextRange);
     }
 
-    public [Symbol.iterator](): Iterator<TextRange, any, any> {
-        return this.ranges[Symbol.iterator]();
+    public *[Symbol.iterator](): Iterator<TextRange, any, any> {
+        for (const range of this.ranges) {
+            yield cloneTextRange(range);
+        }
     }
 
     public addRange(textRange: TextRange): boolean {
         // Future: merge ranges
-
+        const stored = cloneTextRange(textRange);
         // Is this text range already in this collection?
         const pos = collections.binarySearch(
             this.ranges,
-            textRange,
+            stored,
             compareTextRange,
         );
         if (pos >= 0) {
             // Already exists
             return false;
         }
-        this.ranges.splice(~pos, 0, textRange);
-        this.updateMaxSpan(textRange);
+        this.ranges.splice(~pos, 0, stored);
+        this.updateMaxSpan(stored);
         return true;
     }
 
