@@ -517,6 +517,7 @@ export interface IConversationThreads {
 export interface IMessageTextIndex {
     addMessages(
         messages: IMessage[],
+        baseMessageOrdinal: MessageOrdinal,
         eventHandler?: IndexingEventHandlers,
     ): Promise<ListIndexingResult>;
     lookupMessages(
