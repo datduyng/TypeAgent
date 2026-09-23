@@ -608,8 +608,8 @@ class SearchQueryCompiler {
                     for (const facet of term.facets) {
                         if (!isWildcard(facet.facetValue)) {
                             this.addPropertyTermToGroup(
-                                facet.facetValue,
                                 PropertyNames.Topic,
+                                facet.facetValue,
                                 termGroup,
                             );
                         }
