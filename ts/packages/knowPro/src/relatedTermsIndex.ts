@@ -429,6 +429,9 @@ export class TermEmbeddingIndex
     }
 }
 
+// Near misses such as plurals or one typo: "invoices" -> "invoice"
+const DefaultMaxEditDistance = 1;
+
 export class TermEditDistanceIndex
     extends TextEditDistanceIndex
     implements ITermToRelatedTermsFuzzy, TextEmbeddingCache
@@ -455,32 +458,35 @@ export class TermEditDistanceIndex
     public async lookupTerm(
         text: string,
         maxMatches?: number,
-        thresholdScore?: number,
+        maxEditDistance: number = DefaultMaxEditDistance,
     ): Promise<Term[]> {
         const matches = await super.getNearest(
             text,
             maxMatches,
-            thresholdScore,
+            maxEditDistance,
         );
-        return this.matchesToTerms(matches);
+        return this.matchesToTerms(text, matches);
     }
 
     public async lookupTerms(
         textArray: string[],
         maxMatches?: number,
-        thresholdScore?: number,
+        maxEditDistance: number = DefaultMaxEditDistance,
     ): Promise<Term[][]> {
         const matches = await super.getNearestMultiple(
             textArray,
             maxMatches,
-            thresholdScore,
+            maxEditDistance,
         );
-        return matches.map((m) => this.matchesToTerms(m));
+        return matches.map((m, i) => this.matchesToTerms(textArray[i], m));
     }
 
-    private matchesToTerms(matches: Scored<string>[]): Term[] {
+    // Scores are edit distances (0 = identical). Convert them to term weights
+    // in [0, 1] where closer terms weigh more: "invoices" -> "invoice" = 0.875.
+    private matchesToTerms(text: string, matches: Scored<string>[]): Term[] {
         return matches.map((m) => {
-            return { text: m.item, weight: m.score };
+            const maxLength = Math.max(text.length, m.item.length);
+            return { text: m.item, weight: 1 - m.score / maxLength };
         });
     }
 }
