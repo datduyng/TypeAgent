@@ -486,7 +486,11 @@ export class TermEditDistanceIndex
     private matchesToTerms(text: string, matches: Scored<string>[]): Term[] {
         return matches.map((m) => {
             const maxLength = Math.max(text.length, m.item.length);
-            return { text: m.item, weight: 1 - m.score / maxLength };
+            // Two empty terms are an exact match: weight 1, not 0/0
+            return {
+                text: m.item,
+                weight: maxLength === 0 ? 1 : 1 - m.score / maxLength,
+            };
         });
     }
 }
