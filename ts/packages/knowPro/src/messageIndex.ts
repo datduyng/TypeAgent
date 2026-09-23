@@ -76,9 +76,9 @@ export class MessageTextIndex implements IMessageTextEmbeddingIndex {
 
     public addMessages(
         messages: Iterable<IMessage>,
+        baseMessageOrdinal: MessageOrdinal,
         eventHandler?: IndexingEventHandlers,
     ): Promise<ListIndexingResult> {
-        const baseMessageOrdinal: MessageOrdinal = this.size;
         const allChunks: [string, TextLocation][] = [];
         // Collect everything so we can batch efficiently
         let i = 0;
@@ -235,6 +235,7 @@ export async function addToMessageIndex(
         )) {
             const batchResult = await messageIndex.addMessages(
                 messageBatch.value,
+                messageBatch.startAt,
                 eventHandler,
             );
             result.numberCompleted += batchResult.numberCompleted;
