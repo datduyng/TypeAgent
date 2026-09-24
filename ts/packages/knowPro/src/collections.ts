@@ -674,6 +674,7 @@ export class TextRangeCollection implements Iterable<TextRange> {
 
     public addRange(textRange: TextRange): boolean {
         // Future: merge ranges
+
         const stored = cloneTextRange(textRange);
         // Is this text range already in this collection?
         const pos = collections.binarySearch(
