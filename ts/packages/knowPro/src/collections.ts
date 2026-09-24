@@ -20,7 +20,12 @@ import {
     Term,
     TextRange,
 } from "./interfaces.js";
-import { Batch, compareTextRange, isInTextRange } from "./common.js";
+import {
+    Batch,
+    cloneTextRange,
+    compareTextRange,
+    isInTextRange,
+} from "./common.js";
 import { ScoredTextLocation } from "./textLocationIndex.js";
 import { getCountOfMessagesInCharBudget } from "./message.js";
 
@@ -632,8 +637,11 @@ export function intersectScoredMessageOrdinals(
 }
 
 export class TextRangeCollection implements Iterable<TextRange> {
-    // Maintains ranges sorted by message index
+    // Maintains ranges sorted by message index. Stored ranges are private
+    // copies: ordering and maxSpan are only valid if they never change.
     private ranges: TextRange[];
+    // Largest message span of any range; bounds the search in isInRange
+    private maxSpan: number = 0;
 
     constructor(
         ranges?: TextRange[] | undefined,
@@ -645,7 +653,8 @@ export class TextRangeCollection implements Iterable<TextRange> {
                 this.addRanges(ranges);
             }
         } else {
-            this.ranges = ranges ?? [];
+            this.ranges = (ranges ?? []).map(cloneTextRange);
+            this.ranges.forEach((r) => this.updateMaxSpan(r));
         }
     }
 
@@ -654,27 +663,31 @@ export class TextRangeCollection implements Iterable<TextRange> {
     }
 
     public getRanges(): TextRange[] {
-        return this.ranges;
+        return this.ranges.map(cloneTextRange);
     }
 
-    public [Symbol.iterator](): Iterator<TextRange, any, any> {
-        return this.ranges[Symbol.iterator]();
+    public *[Symbol.iterator](): Iterator<TextRange, any, any> {
+        for (const range of this.ranges) {
+            yield cloneTextRange(range);
+        }
     }
 
     public addRange(textRange: TextRange): boolean {
         // Future: merge ranges
 
+        const stored = cloneTextRange(textRange);
         // Is this text range already in this collection?
         const pos = collections.binarySearch(
             this.ranges,
-            textRange,
+            stored,
             compareTextRange,
         );
         if (pos >= 0) {
             // Already exists
             return false;
         }
-        this.ranges.splice(~pos, 0, textRange);
+        this.ranges.splice(~pos, 0, stored);
+        this.updateMaxSpan(stored);
         return true;
     }
 
@@ -687,30 +700,26 @@ export class TextRangeCollection implements Iterable<TextRange> {
     }
 
     public isInRange(rangeToMatch: TextRange): boolean {
-        if (this.ranges.length === 0) {
-            return false;
-        }
-        // Find the first text range with messageIndex == rangeToMatch.start.messageIndex
-        let i = collections.binarySearchFirst(
+        // Ranges are sorted by start. A range can contain rangeToMatch only if
+        // it starts at or before it, and no earlier than the longest range
+        // (maxSpan messages) allows. Example: ranges [0,5) and [8,12) contain
+        // message 2 through [0,5), which starts before message 2.
+        const messageOrdinal = rangeToMatch.start.messageOrdinal;
+        const compareStart = (x: TextRange, y: MessageOrdinal) =>
+            x.start.messageOrdinal - y;
+        const startAt = collections.binarySearchFirst(
             this.ranges,
-            rangeToMatch,
-            (x, y) => x.start.messageOrdinal - y.start.messageOrdinal,
+            messageOrdinal - this.maxSpan,
+            compareStart,
         );
-        if (i < 0) {
-            return false;
-        }
-        if (i == this.ranges.length) {
-            i--;
-        }
-        // Now loop over all text ranges that start at rangeToMatch.start.messageIndex
-        for (; i < this.ranges.length; ++i) {
-            const range = this.ranges[i];
-            if (
-                range.start.messageOrdinal > rangeToMatch.start.messageOrdinal
-            ) {
-                break;
-            }
-            if (isInTextRange(range, rangeToMatch)) {
+        const endAt = collections.binarySearchLast(
+            this.ranges,
+            messageOrdinal,
+            compareStart,
+            startAt,
+        );
+        for (let i = startAt; i < endAt; ++i) {
+            if (isInTextRange(this.ranges[i], rangeToMatch)) {
                 return true;
             }
         }
@@ -719,6 +728,14 @@ export class TextRangeCollection implements Iterable<TextRange> {
 
     public clear(): void {
         this.ranges = [];
+        this.maxSpan = 0;
+    }
+
+    private updateMaxSpan(range: TextRange): void {
+        const span = range.end
+            ? range.end.messageOrdinal - range.start.messageOrdinal
+            : 0;
+        this.maxSpan = Math.max(this.maxSpan, span);
     }
 }
 

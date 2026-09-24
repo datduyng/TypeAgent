@@ -61,6 +61,13 @@ export function compareTextRange(x: TextRange, y: TextRange) {
     return cmp;
 }
 
+export function cloneTextRange(range: TextRange): TextRange {
+    return {
+        start: { ...range.start },
+        end: range.end ? { ...range.end } : undefined,
+    };
+}
+
 export function isInTextRange(
     outerRange: TextRange,
     innerRange: TextRange,
