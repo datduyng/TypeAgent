@@ -45,6 +45,26 @@ $ curl -G http://127.0.0.1:51703/api/story/commits/79f77a3 --data-urlencode proj
 
 Routes are in `src/server/router.ts`; handlers are in `src/server/routes/`.
 
+## Privacy filtering
+
+The daemon exposes a local filter for story code to call before its first storage or sharing boundary. Private text uses a per-daemon Unix socket recorded in `daemon.json`; it never crosses the daemon's loopback TCP API. GLiNER2 finds semantic PII first. The filter replaces those spans with `[REDACTED:PII]`, then runs Tirith's `public-paste` policy for secrets, internal hosts, home paths, and private IP addresses. Either tool failing rejects the request without returning partial output.
+
+Install Python 3.11 and Tirith 0.4.2, then run:
+
+```text
+$ git story privacy setup --tirith /absolute/path/to/tirith
+$ git story privacy status
+$ git story daemon start
+$ printf '%s' 'Contact Ada at ada@example.invalid' | git story privacy redact
+Contact [REDACTED:PII] at [REDACTED:PII]
+```
+
+`privacy redact` reads stdin so private text does not appear in the process list. The IPC endpoint accepts `POST /api/privacy/redact` with a JSON body containing one `text` string. It is private implementation detail rather than part of the loopback HTTP API.
+
+Setup downloads the pinned [`fastino/gliner2-privacy-filter-PII-multi`](https://huggingface.co/fastino/gliner2-privacy-filter-PII-multi/tree/1cb4166094dc58fa8d836429f060d6c95f62b495) model, installs the hashed [GLiNER2 2.0.0](https://github.com/fastino-ai/GLiNER2/tree/3c913c7369301133d3b7699252074c4303ada50e) release with Transformers 4.45.2, verifies every artifact, and publishes the installation only after both tools pass smoke tests. GLiNER2 and the model are Apache-2.0. Runtime inference uses only local files with Hugging Face and Transformers offline modes enabled. The model needs about 3 GB of memory after loading and the installed model is about 1.2 GB. Setup currently supports macOS 14 or later on Apple silicon. The 42-label schema leaves room for about 160 simple words; longer inputs fail closed.
+
+This is risk reduction, not a complete DLP boundary. Synthetic tests still missed Chinese and Japanese names. [Tirith 0.4.2](https://github.com/sheeki03/tirith/tree/v0.4.2) is [AGPL-3.0-only](https://github.com/sheeki03/tirith/blob/v0.4.2/LICENSE) unless separately commercially licensed. Review its license before distribution or service deployment; git-story does not install or bundle Tirith.
+
 ## Trademarks
 
 This project may contain trademarks or logos for projects, products, or services. Authorized use of Microsoft
