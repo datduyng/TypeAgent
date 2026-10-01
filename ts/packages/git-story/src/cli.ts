@@ -8,12 +8,14 @@ import { Command } from "commander";
 import { daemonCommand } from "./commands/daemon.js";
 import { hooksCommand } from "./commands/hooks.js";
 import { initCommand } from "./commands/init.js";
+import { privacyCommand } from "./commands/privacy.js";
 
 const program = new Command("git-story")
     .description("Attach agent session stories to git commits")
     .version("0.0.1")
     .addCommand(initCommand)
     .addCommand(hooksCommand)
-    .addCommand(daemonCommand);
+    .addCommand(daemonCommand)
+    .addCommand(privacyCommand);
 
 program.parse();

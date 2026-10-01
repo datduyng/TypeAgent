@@ -4,11 +4,26 @@
 import { Command } from "commander";
 import { spawn } from "node:child_process";
 import fs from "node:fs";
-import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import {
+    createPrivacyFilter,
+    type PrivacyFilter,
+    PrivacyFilterError,
+} from "../privacy/privacyFilter.js";
+import { readPrivacyReadyManifest } from "../privacy/setup.js";
+import {
+    createPrivacyEndpoint,
+    daemonStateDirectory,
+    type DaemonState,
+    prepareDaemonStateDirectory,
+    readDaemonStateFile,
+    removeDaemonStateIfOwned,
+    removePrivacyEndpoint,
+    writeDaemonStateFile,
+} from "../server/daemonState.js";
 import { DAEMON_ROUTE } from "../server/router.js";
-import { startServer } from "../server/server.js";
+import { startPrivacyServer, startServer } from "../server/server.js";
 
 // One daemon per user, shared by every project. Each API request names its
 // project by absolute path, so the daemon does not depend on any cwd.
@@ -16,7 +31,7 @@ import { startServer } from "../server/server.js";
 //   git story daemon start   (from any directory)
 //     └─ spawns detached `node daemonMain.js` (no CLI command)
 //          └─ listens on 127.0.0.1:51703 (DAEMON_PORT)
-//          └─ writes ~/.typeagent/git-story/daemon.json {"pid":4242,"port":51703}
+//          └─ writes daemon.json with pid, port, and a private IPC endpoint
 //   GET /api/story/commits/739e112?project=/Users/me/repo
 //   GET /api/story/commits/739e112?project=C:\Users\me\repo  (URL-encoded)
 //   git story daemon status  -> reads daemon.json, asks the port for its pid
@@ -27,25 +42,18 @@ import { startServer } from "../server/server.js";
 // frees it when the holder exits or crashes, so no stale lock survives.
 // Only the port holder writes daemon.json; others only read it.
 //
-// `~` is os.homedir(): /Users/me on macOS, C:\Users\me on Windows.
-// Shared TypeAgent user dir, as in packages/config.
-const STATE_DIR = path.join(".typeagent", "git-story");
-const STATE_FILE = "daemon.json";
+// The shared state path comes from os.homedir() in daemonState.ts.
 const LOG_FILE = "daemon.log";
 const START_TIMEOUT_MS = 5000;
 const STOP_TIMEOUT_MS = 5000;
 const POLL_MS = 50;
 const IDENTITY_TIMEOUT_MS = 1000;
 
-type DaemonState = { pid: number; port: number };
-
 // Entry point `start` spawns; not exposed as a CLI command.
 const DAEMON_MAIN = path.resolve(
     path.dirname(fileURLToPath(import.meta.url)),
     "../daemonMain.js",
 );
-
-const stateDir = () => path.join(os.homedir(), STATE_DIR);
 
 function isAlive(pid: number): boolean {
     try {
@@ -74,34 +82,11 @@ async function answersAsDaemon(state: DaemonState): Promise<boolean> {
 // Running daemon's state, or undefined for a missing, corrupt, or stale
 // file. Never deletes: only the port holder owns the file.
 async function readState(): Promise<DaemonState | undefined> {
-    const file = path.join(stateDir(), STATE_FILE);
-    let state: Partial<DaemonState> | null;
-    try {
-        state = JSON.parse(fs.readFileSync(file, "utf8"));
-    } catch {
-        return undefined;
+    const state = readDaemonStateFile();
+    if (state && isAlive(state.pid) && (await answersAsDaemon(state))) {
+        return state;
     }
-    // A corrupt file (e.g. `null`) is stale state, not a crash.
-    if (
-        Number.isInteger(state?.pid) &&
-        Number.isInteger(state?.port) &&
-        isAlive(state!.pid!) &&
-        (await answersAsDaemon(state as DaemonState))
-    )
-        return state as DaemonState;
     return undefined;
-}
-
-// Removes the state file only if `pid` still owns it, so a stopping daemon
-// never deletes a newer daemon's state.
-function removeStateIfOwned(pid: number): void {
-    const file = path.join(stateDir(), STATE_FILE);
-    try {
-        if (JSON.parse(fs.readFileSync(file, "utf8"))?.pid !== pid) return;
-    } catch {
-        return;
-    }
-    fs.rmSync(file, { force: true });
 }
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
@@ -120,9 +105,9 @@ async function start(): Promise<void> {
         );
         return;
     }
-    const dir = stateDir();
-    fs.mkdirSync(dir, { recursive: true });
-    const log = fs.openSync(path.join(dir, LOG_FILE), "a");
+    const dir = daemonStateDirectory();
+    prepareDaemonStateDirectory();
+    const log = fs.openSync(path.join(dir, LOG_FILE), "a", 0o600);
     // cwd is the state dir so the daemon never holds a project directory
     // open (Windows cannot delete a directory that is some process's cwd).
     // windowsHide: no console window on Windows.
@@ -173,7 +158,7 @@ async function stop(): Promise<void> {
     process.kill(state.pid, "SIGTERM");
     for (let t = 0; t < STOP_TIMEOUT_MS; t += POLL_MS) {
         if (!isAlive(state.pid)) {
-            removeStateIfOwned(state.pid);
+            removeDaemonStateIfOwned(state.pid);
             process.stdout.write(`Stopped (pid ${state.pid})\n`);
             return;
         }
@@ -183,12 +168,144 @@ async function stop(): Promise<void> {
     process.exitCode = 1;
 }
 
+const PRIVACY_REQUEST_TIMEOUT_MS = 240_000;
+const MAX_QUEUED_PRIVACY_REQUESTS = 16;
+
+type PrivacyRequest = {
+    readonly text: string;
+    readonly signal: AbortSignal | undefined;
+    readonly controller: AbortController;
+    readonly resolve: (text: string) => void;
+    readonly reject: (error: PrivacyFilterError) => void;
+    readonly onAbort: () => void;
+    timer: NodeJS.Timeout | undefined;
+    settled: boolean;
+};
+
+// One daemon queue bounds model memory and covers generation changes. A new
+// generation starts only after the previous request and worker have closed.
+function createLazyPrivacyFilter(): PrivacyFilter {
+    let current: { name: string; filter: PrivacyFilter } | undefined;
+    const queue: PrivacyRequest[] = [];
+    let active: PrivacyRequest | undefined;
+    let closed = false;
+
+    function settle(
+        request: PrivacyRequest,
+        result: string | PrivacyFilterError,
+    ): void {
+        if (request.settled) return;
+        request.settled = true;
+        if (request.timer !== undefined) clearTimeout(request.timer);
+        request.signal?.removeEventListener("abort", request.onAbort);
+        if (result instanceof PrivacyFilterError) request.reject(result);
+        else request.resolve(result);
+    }
+
+    function abort(
+        request: PrivacyRequest,
+        code: "timeout" | "unavailable",
+    ): void {
+        const index = queue.indexOf(request);
+        if (index !== -1) queue.splice(index, 1);
+        settle(request, new PrivacyFilterError(code));
+        if (active === request) request.controller.abort();
+    }
+
+    async function run(request: PrivacyRequest): Promise<void> {
+        try {
+            const manifest = readPrivacyReadyManifest();
+            if (!manifest) throw new PrivacyFilterError("unavailable");
+            if (current?.name !== manifest.generation) {
+                await current?.filter.close();
+                current = {
+                    name: manifest.generation,
+                    filter: createPrivacyFilter(manifest),
+                };
+            }
+            const result = await current.filter.redact(
+                request.text,
+                request.controller.signal,
+            );
+            settle(request, result);
+        } catch (error) {
+            settle(
+                request,
+                error instanceof PrivacyFilterError
+                    ? error
+                    : new PrivacyFilterError("unavailable"),
+            );
+        } finally {
+            active = undefined;
+            startNext();
+        }
+    }
+
+    function startNext(): void {
+        if (active !== undefined || closed) return;
+        const next = queue.shift();
+        if (next === undefined) return;
+        active = next;
+        void run(next);
+    }
+
+    return {
+        redact(text, signal) {
+            if (text.length === 0) return Promise.resolve(text);
+            if (closed || signal?.aborted) {
+                return Promise.reject(new PrivacyFilterError("unavailable"));
+            }
+            if (
+                active !== undefined &&
+                queue.length >= MAX_QUEUED_PRIVACY_REQUESTS
+            ) {
+                return Promise.reject(new PrivacyFilterError("queue_full"));
+            }
+            return new Promise((resolve, reject) => {
+                const controller = new AbortController();
+                const request: PrivacyRequest = {
+                    text,
+                    signal,
+                    controller,
+                    resolve,
+                    reject,
+                    onAbort: () => abort(request, "unavailable"),
+                    timer: undefined,
+                    settled: false,
+                };
+                request.timer = setTimeout(
+                    () => abort(request, "timeout"),
+                    PRIVACY_REQUEST_TIMEOUT_MS,
+                );
+                request.timer.unref();
+                signal?.addEventListener("abort", request.onAbort, {
+                    once: true,
+                });
+                queue.push(request);
+                startNext();
+            });
+        },
+        async close() {
+            if (closed) return;
+            closed = true;
+            for (const request of queue.splice(0)) {
+                settle(request, new PrivacyFilterError("unavailable"));
+            }
+            if (active !== undefined) {
+                settle(active, new PrivacyFilterError("unavailable"));
+                active.controller.abort();
+            }
+            await current?.filter.close();
+        },
+    };
+}
+
 // Daemon body, run by daemonMain.js in the process `start` spawns. Writes the state file once
 // listening, removes it on SIGTERM/SIGINT.
 // Fails (see daemon.log) when the port is in use.
 export async function runDaemon(): Promise<void> {
     const port = DAEMON_PORT;
-    const file = path.join(stateDir(), STATE_FILE);
+    const privacyFilter = createLazyPrivacyFilter();
     let server: Awaited<ReturnType<typeof startServer>>;
     try {
         server = await startServer(port);
@@ -199,20 +316,61 @@ export async function runDaemon(): Promise<void> {
         process.exitCode = 1;
         return;
     }
-    // Holding the port makes this the only daemon: publish its state.
-    // Write then rename so readers never see a partial file.
-    const state: DaemonState = { pid: process.pid, port };
-    fs.mkdirSync(path.dirname(file), { recursive: true });
-    const tmp = `${file}.${process.pid}.tmp`;
-    fs.writeFileSync(tmp, JSON.stringify(state) + "\n");
-    fs.renameSync(tmp, file);
+
+    let privacyEndpoint: string | undefined;
+    let privacyServer:
+        | Awaited<ReturnType<typeof startPrivacyServer>>
+        | undefined;
+    if (process.platform !== "win32") {
+        const staleEndpoint = readDaemonStateFile()?.privacyEndpoint;
+        try {
+            removePrivacyEndpoint(staleEndpoint);
+            privacyEndpoint = createPrivacyEndpoint();
+            privacyServer = await startPrivacyServer(
+                privacyEndpoint,
+                privacyFilter,
+            );
+        } catch (e) {
+            removePrivacyEndpoint(privacyEndpoint);
+            await privacyFilter.close();
+            server.closeAllConnections();
+            server.close();
+            process.stderr.write(
+                `Cannot create the private endpoint: ${(e as Error).message}\n`,
+            );
+            process.exitCode = 1;
+            return;
+        }
+    }
+
+    // Holding the port makes this the only daemon. Publish available endpoints last.
+    const state: DaemonState = {
+        pid: process.pid,
+        port,
+        ...(privacyEndpoint === undefined ? {} : { privacyEndpoint }),
+    };
+    writeDaemonStateFile(state);
     process.stdout.write(`Listening at ${url(state)}\n`);
+    let shuttingDown = false;
     const shutdown = () => {
-        // Before close: the port is still held, so no new daemon can have
-        // written its state yet.
-        removeStateIfOwned(process.pid);
-        server.close(() => process.exit(0));
-        // Do not wait on keep-alive connections.
+        if (shuttingDown) return;
+        shuttingDown = true;
+        removeDaemonStateIfOwned(process.pid);
+        const finish = async () => {
+            try {
+                await privacyFilter.close();
+                removePrivacyEndpoint(privacyEndpoint);
+            } finally {
+                process.exit(0);
+            }
+        };
+        if (privacyServer !== undefined) {
+            privacyServer.close(() => void finish());
+            privacyServer.closeAllConnections();
+        } else {
+            void finish();
+        }
+        server.close();
         server.closeAllConnections();
     };
     process.once("SIGTERM", shutdown);
