@@ -7,7 +7,7 @@ import {
     routePrompt,
     type RoutePromptDependencies,
 } from "../src/hooks/hook-router.js";
-import type { UserPromptSubmittedInput } from "../src/hooks/types.js";
+import type { UserPromptSubmittedInput } from "@typeagent/agent-harness-hooks";
 
 const input: UserPromptSubmittedInput = {
     sessionId: "session-1",

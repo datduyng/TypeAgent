@@ -42,7 +42,17 @@ export type UserPromptSubmittedOutput = {
     handled?: boolean;
     responseContent?: string;
     handledBy?: string;
+    /** Replaces the transformed prompt sent to the model. */
+    modifiedTransformedPrompt?: string;
 };
+
+/** userPromptTransformed input: the prompt after CLI expansion. */
+export type UserPromptTransformedInput = UserPromptSubmittedInput & {
+    transformedPrompt: string;
+};
+
+/** userPromptTransformed output. Same fields as userPromptSubmitted. */
+export type UserPromptTransformedOutput = UserPromptSubmittedOutput;
 
 /** sessionStart input. */
 export type SessionStartInput = BaseHookInput & {

@@ -22,7 +22,7 @@ import { emitProgress } from "../shared/hook-progress.js";
 import type {
     UserPromptSubmittedInput,
     UserPromptSubmittedOutput,
-} from "./types.js";
+} from "@typeagent/agent-harness-hooks";
 
 export interface DirectHandlingOptions {
     forceHandled?: boolean;

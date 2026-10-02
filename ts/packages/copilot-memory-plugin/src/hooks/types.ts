@@ -1,24 +1,22 @@
 // Copyright (c) Microsoft Corporation.
 // Licensed under the MIT License.
 
-export type PromptHookInput = {
-    sessionId: string;
-    timestamp?: number;
-    cwd: string;
-    prompt: string;
-    transformedPrompt?: string;
-};
+import type {
+    AgentStopInput,
+    UserPromptSubmittedInput,
+    UserPromptTransformedInput,
+    UserPromptTransformedOutput,
+} from "@typeagent/agent-harness-hooks";
 
-export type StopHookInput = {
-    sessionId: string;
-    timestamp?: number;
-    cwd: string;
-    transcriptPath?: string;
+// One router handles both prompt hooks; transformedPrompt marks the second.
+export type PromptHookInput =
+    | UserPromptSubmittedInput
+    | UserPromptTransformedInput;
+
+// Non-Copilot hosts may also send the response text and knowledge.
+export type StopHookInput = AgentStopInput & {
     response?: string;
     knowledge?: unknown;
 };
 
-export type HookOutput = {
-    additionalContext?: string;
-    modifiedTransformedPrompt?: string;
-};
+export type HookOutput = UserPromptTransformedOutput;

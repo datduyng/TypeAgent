@@ -13,7 +13,7 @@
 import type {
     UserPromptSubmittedInput,
     UserPromptSubmittedOutput,
-} from "./types.js";
+} from "@typeagent/agent-harness-hooks";
 import { parseRecordingDirective } from "@typeagent/dispatcher-types";
 import {
     getMcpRouting,

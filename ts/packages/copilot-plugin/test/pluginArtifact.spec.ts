@@ -11,7 +11,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { parse } from "yaml";
-import type { UserPromptSubmittedOutput } from "../src/hooks/types.js";
+import type { UserPromptSubmittedOutput } from "@typeagent/agent-harness-hooks";
 
 interface PluginMcpManifest {
     mcpServers: Record<
