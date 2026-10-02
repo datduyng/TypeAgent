@@ -3,7 +3,7 @@
 
 <!-- AUTOGEN:DOCS:START -->
 
-<!-- AUTOGEN:DOCS:HASH:sha256=c312cb993fd5a77b2638dcfc6637fc8ee52870c27431dfae178ced4f062077a5 -->
+<!-- AUTOGEN:DOCS:HASH:sha256=8e8bb04db14493efd52ed97ab5cb1490638fe2d1407f1eec36cbd7724fb6706e -->
 <!-- AUTOGEN:DOCS:SOURCE: ./README.md (hand-written documentation; this file is the AI-generated companion) -->
 
 # @typeagent/agent-harness-hooks — AI-generated documentation
@@ -20,7 +20,7 @@ Agent harness hook payload and output types
 
 ### Entry points
 
-- default → `./dist/index.js` _(not found on disk)_
+- `./copilot-cli` → `./dist/copilot-cli.js` _(not found on disk)_
 
 ### Dependencies
 
@@ -36,10 +36,10 @@ External: _None at runtime._
 
 ### Files of interest
 
-`./src/index.ts`, `./src/tsconfig.json`.
+`./src/copilot-cli.ts`, `./src/tsconfig.json`.
 
 ---
 
-_Auto-generated against commit `67b40e70b5827ada99ccfc0df3648f0e84a3b9c9` on `2026-10-02T00:57:37.904Z` by `docs-generate.yml`. Links validated at that commit; the working tree may have drifted by up to 24h. Re-run `pnpm --filter @typeagent/agent-harness-hooks docs:verify-links` to spot-check._
+_Auto-generated against commit `ad24044eb736a70eba233a354b5f14679fa39511` on `2026-10-02T02:28:16.035Z` by `docs-generate.yml`. Links validated at that commit; the working tree may have drifted by up to 24h. Re-run `pnpm --filter @typeagent/agent-harness-hooks docs:verify-links` to spot-check._
 
 <!-- AUTOGEN:DOCS:END -->
