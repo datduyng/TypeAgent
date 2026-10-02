@@ -4,7 +4,7 @@
 import type {
     UserPromptSubmittedInput,
     UserPromptSubmittedOutput,
-} from "@typeagent/agent-harness-hooks";
+} from "@typeagent/agent-harness-hooks/copilot-cli";
 import { Command } from "commander";
 
 // Reads all of stdin. Hooks get their payload here (Copilot JSON, or lines

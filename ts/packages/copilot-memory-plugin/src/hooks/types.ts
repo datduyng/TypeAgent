@@ -4,14 +4,14 @@
 import type {
     AgentStopInput,
     UserPromptSubmittedInput,
-    UserPromptTransformedInput,
-    UserPromptTransformedOutput,
-} from "@typeagent/agent-harness-hooks";
+    UserPromptSubmittedOutput,
+} from "@typeagent/agent-harness-hooks/copilot-cli";
 
 // One router handles both prompt hooks; transformedPrompt marks the second.
+// userPromptTransformed adds the expanded prompt to the submitted payload.
 export type PromptHookInput =
     | UserPromptSubmittedInput
-    | UserPromptTransformedInput;
+    | (UserPromptSubmittedInput & { transformedPrompt: string });
 
 // Non-Copilot hosts may also send the response text and knowledge.
 export type StopHookInput = AgentStopInput & {
@@ -19,4 +19,7 @@ export type StopHookInput = AgentStopInput & {
     knowledge?: unknown;
 };
 
-export type HookOutput = UserPromptTransformedOutput;
+// userPromptTransformed can also replace the expanded prompt.
+export type HookOutput = UserPromptSubmittedOutput & {
+    modifiedTransformedPrompt?: string;
+};

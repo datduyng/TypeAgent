@@ -22,7 +22,7 @@ import { emitProgress } from "../shared/hook-progress.js";
 import type {
     UserPromptSubmittedInput,
     UserPromptSubmittedOutput,
-} from "@typeagent/agent-harness-hooks";
+} from "@typeagent/agent-harness-hooks/copilot-cli";
 
 export interface DirectHandlingOptions {
     forceHandled?: boolean;

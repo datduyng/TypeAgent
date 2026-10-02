@@ -26,7 +26,7 @@ import { fileURLToPath } from "node:url";
 import type {
     UserPromptSubmittedInput,
     UserPromptSubmittedOutput,
-} from "@typeagent/agent-harness-hooks";
+} from "@typeagent/agent-harness-hooks/copilot-cli";
 import { connectToAgentServer } from "../shared/typeagent-client.js";
 import { redactTraceValue } from "@typeagent/copilot-macros";
 import { getMacroFeatures } from "../shared/macro-features.js";

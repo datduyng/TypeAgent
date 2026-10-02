@@ -13,7 +13,7 @@
 import type {
     UserPromptSubmittedInput,
     UserPromptSubmittedOutput,
-} from "@typeagent/agent-harness-hooks";
+} from "@typeagent/agent-harness-hooks/copilot-cli";
 import { parseRecordingDirective } from "@typeagent/dispatcher-types";
 import {
     getMcpRouting,
