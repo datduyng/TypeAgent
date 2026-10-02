@@ -3,7 +3,7 @@
 
 <!-- AUTOGEN:DOCS:START -->
 
-<!-- AUTOGEN:DOCS:HASH:sha256=7be1ff9b402e11fa7eb5b3f181dc1ae40066fba9c6b98b65f310f43b53b57e76 -->
+<!-- AUTOGEN:DOCS:HASH:sha256=c6e87e9424b87e209d946deac55c91a95c729215ac1cdfa40d5b642042236770 -->
 <!-- AUTOGEN:DOCS:SOURCE: ./README.md (hand-written documentation; this file is the AI-generated companion) -->
 
 # git-story — AI-generated documentation
@@ -24,7 +24,9 @@ _No public exports declared in `package.json`._
 
 ### Dependencies
 
-Workspace: _None._
+Workspace:
+
+- [@typeagent/agent-harness-hooks](../../packages/agent-harness-hooks/README.md)
 
 External: `@hono/node-server`, `commander`, `hono`
 
@@ -34,6 +36,6 @@ External: `@hono/node-server`, `commander`, `hono`
 
 ---
 
-_Auto-generated against commit `9e238f2dff5790580ec66b2fa78897a9334577e8` on `2026-09-30T18:50:32.999Z` by `docs-generate.yml`. Links validated at that commit; the working tree may have drifted by up to 24h. Re-run `pnpm --filter git-story docs:verify-links` to spot-check._
+_Auto-generated against commit `67b40e70b5827ada99ccfc0df3648f0e84a3b9c9` on `2026-10-02T00:57:37.904Z` by `docs-generate.yml`. Links validated at that commit; the working tree may have drifted by up to 24h. Re-run `pnpm --filter git-story docs:verify-links` to spot-check._
 
 <!-- AUTOGEN:DOCS:END -->
