@@ -7,9 +7,9 @@ import {
     routePrompt,
     type RoutePromptDependencies,
 } from "../src/hooks/hook-router.js";
-import type { HookInput } from "../src/hooks/types.js";
+import type { UserPromptSubmittedInput } from "../src/hooks/types.js";
 
-const input: HookInput = {
+const input: UserPromptSubmittedInput = {
     sessionId: "session-1",
     timestamp: 1,
     cwd: ".",

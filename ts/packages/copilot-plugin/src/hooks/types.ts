@@ -19,60 +19,56 @@
  */
 
 /** Fields present on every hook payload. */
-export interface BaseHookInput {
+export type BaseHookInput = {
     sessionId: string;
     /** Epoch milliseconds. */
     timestamp: number;
     cwd: string;
-}
+};
 
 /** userPromptSubmitted input. */
-export interface UserPromptSubmittedInput extends BaseHookInput {
+export type UserPromptSubmittedInput = BaseHookInput & {
     prompt: string;
-}
+};
 
 /**
  * userPromptSubmitted output. Set `handled` with `responseContent` to answer
  * without a model call.
  */
-export interface UserPromptSubmittedOutput {
+export type UserPromptSubmittedOutput = {
     modifiedPrompt?: string;
     additionalContext?: string;
     suppressOutput?: boolean;
     handled?: boolean;
     responseContent?: string;
     handledBy?: string;
-}
+};
 
 /** sessionStart input. */
-export interface SessionStartInput extends BaseHookInput {
+export type SessionStartInput = BaseHookInput & {
     source: "startup" | "resume" | "new";
     initialPrompt?: string;
-}
+};
 
 /** sessionStart output. `additionalContext` is injected into the conversation. */
-export interface SessionStartOutput {
+export type SessionStartOutput = {
     additionalContext?: string;
-}
+};
 
 /** agentStop input. */
-export interface AgentStopInput extends BaseHookInput {
+export type AgentStopInput = BaseHookInput & {
     /** Example: "end_turn". */
     stopReason?: string;
     transcriptPath?: string;
     /** True when this stop follows an earlier `decision: "block"`. */
     stop_hook_active?: boolean;
-}
+};
 
 /**
  * agentStop output. `{ decision: "block", reason }` keeps the agent running
  * with `reason` as the next user message. The CLI caps consecutive blocks at 8.
  */
-export interface AgentStopOutput {
+export type AgentStopOutput = {
     decision?: "block";
     reason?: string;
-}
-
-/** Existing names for the userPromptSubmitted hook. */
-export type HookInput = UserPromptSubmittedInput;
-export type HookOutput = UserPromptSubmittedOutput;
+};
