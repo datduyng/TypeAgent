@@ -509,12 +509,17 @@ export function nearestNeighborEditDistance(
         const matches = createTopNList<string>(maxMatches);
         for (const text of textList) {
             const distance: number = levenshtein.get(text, other);
-            // We want to return those with an edit distance < than the min
+            // We want to return those with an edit distance < than the min.
+            // createTopNList keeps the highest scores, so push the negated
+            // distance to keep the closest matches.
             if (distance <= maxEditDistance) {
-                matches.push(text, distance);
+                matches.push(text, -distance);
             }
         }
-        return matches.byRank();
+        return matches.byRank().map(({ item, score }) => ({
+            item,
+            score: -score!,
+        }));
     } else {
         const matches: Scored<string>[] = [];
         for (const text of textList) {
@@ -523,7 +528,7 @@ export function nearestNeighborEditDistance(
                 matches.push({ item: text, score: distance });
             }
         }
-        matches.sort((x, y) => y.score! - x.score!);
+        matches.sort((x, y) => x.score! - y.score!);
         return matches;
     }
 }
